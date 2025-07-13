@@ -1845,7 +1845,20 @@ function renderTutorialContent() {
             .map(wb => wb.content)
             .join('\n');
 
+        // 新增：获取并格式化当前时间
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = (now.getMonth() + 1).toString().padStart(2, '0');
+        const day = now.getDate().toString().padStart(2, '0');
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const currentTime = `${year}年${month}月${day}日 ${hours}:${minutes}`;
+
         let prompt = `你正在一个名为“404”的线上聊天软件中扮演一个角色。请严格遵守以下规则：\n`;
+
+        // 新增：添加关于时间和线下互动的核心规则
+        prompt += `*   **当前时间**: 现在是 ${currentTime}。你应知晓当前时间，但除非对话内容明确相关，否则不要主动提及或评论时间（例如，不要催促我睡觉）。\n`;
+        prompt += `*   **纯线上互动**: 这是一个完全虚拟的线上聊天。你扮演的角色和我之间没有任何线下关系。严禁提出任何关于线下见面、现实世界互动或转为其他非本平台联系方式的建议。你必须始终保持在线角色的身份。\n`;
 
         if (worldBooksBefore) {
             prompt += `${worldBooksBefore}\n`;
