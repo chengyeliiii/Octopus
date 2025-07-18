@@ -1022,6 +1022,53 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+// 在 <script> 标签内，DOMContentLoaded 事件监听器的顶部添加此函数
+
+async function compressImage(file, options = {}) {
+    // 默认压缩选项
+    const { quality = 0.8, maxWidth = 800, maxHeight = 800 } = options;
+
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onerror = reject;
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onerror = reject;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                // 按比例缩放图片尺寸
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round(height * (maxWidth / width));
+                        width = maxWidth;
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round(width * (maxHeight / height));
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+
+                // 在Canvas上绘制缩放后的图片
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // 将Canvas内容转换为指定质量的JPG格式的Base64字符串
+                // JPG格式通常比PNG有更好的压缩率，适合照片类图片
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve(compressedDataUrl);
+            };
+        };
+    });
+}
     // --- Initial HTML Injection ---
     document.getElementById('api-settings-screen').innerHTML = `<header class="app-header"><button class="back-btn" data-target="home-screen">‹</button><div class="title-container"><h1 class="title">API 设置</h1></div><div class="placeholder"></div></header><main class="content"><form id="api-form"><div class="form-group"><label for="api-provider">API 服务商</label><select id="api-provider" name="provider"><option value="newapi">NewAPI (自定义)</option><option value="deepseek">DeepSeek</option><option value="claude">Claude</option><option value="gemini">Gemini</option></select></div><div class="form-group"><label for="api-url">API 地址（后缀不用添加/v1）</label><input type="url" id="api-url" name="url" placeholder="选择服务商可自动填写" required></div><div class="form-group"><label for="api-key">密钥 (Key)</label><input type="password" id="api-key" name="key" placeholder="请输入你的API密钥" required></div><button type="button" class="btn btn-secondary" id="fetch-models-btn"><span class="btn-text">点击拉取模型</span><div class="spinner"></div></button><div class="form-group"><label for="api-model">选择模型</label><select id="api-model" name="model" required><option value="">请先拉取模型列表</option></select></div><button type="submit" class="btn btn-primary" id="save-btn"><span class="btn-text">保 存</span><div class="spinner"></div></button></form></main>`;
     document.getElementById('wallpaper-screen').innerHTML = `<header class="app-header"><button class="back-btn" data-target="home-screen">‹</button><div class="title-container"><h1 class="title">更换壁纸</h1></div><div class="placeholder"></div></header><main class="content"><div class="wallpaper-preview" id="wallpaper-preview"><span>当前壁纸预览</span></div><input type="file" id="wallpaper-upload" accept="image/*" style="display: none;"><label for="wallpaper-upload" class="btn btn-primary">从相册选择新壁纸</label></main>`;
@@ -1078,7 +1125,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadData = () => { const data = localStorage.getItem('gemini-chat-app-db'); if (data) db = JSON.parse(data); if (!db.apiSettings) db.apiSettings = {}; if (!db.wallpaper) db.wallpaper = 'https://i.postimg.cc/W4Z9R9x4/ins-1.jpg'; if (!db.characters) db.characters = []; if (!db.groups) db.groups = []; if (!db.myStickers) db.myStickers = []; if (!db.homeScreenMode) db.homeScreenMode = 'night'; if (!db.worldBooks) db.worldBooks = []; if (!db.fontUrl) db.fontUrl = ''; if (!db.customIcons) db.customIcons = {}; db.characters.forEach(c => { if (c.isPinned === undefined) c.isPinned = false; if (c.status === undefined) c.status = '在线'; if (!c.worldBookIds) c.worldBookIds = [];}); db.groups.forEach(g => { if(g.isPinned === undefined) g.isPinned = false; }); };
     const showToast = (message) => { toastElement.textContent = message; toastElement.classList.add('show'); setTimeout(() => toastElement.classList.remove('show'), 3000); };
     const switchScreen = (targetId) => { screens.forEach(screen => screen.classList.remove('active')); document.getElementById(targetId)?.classList.add('active'); settingsSidebar.classList.remove('open'); groupSettingsSidebar.classList.remove('open'); addCharModal.classList.remove('visible'); createGroupModal.classList.remove('visible'); editGroupMemberModal.classList.remove('visible'); stickerModal.classList.remove('visible'); stickerActionSheet.classList.remove('visible'); sendVoiceModal.classList.remove('visible'); sendPvModal.classList.remove('visible'); sendTransferModal.classList.remove('visible'); sendGiftModal.classList.remove('visible'); receiveTransferActionSheet.classList.remove('visible'); worldBookSelectionModal.classList.remove('visible'); addMemberActionSheet.classList.remove('visible'); inviteMemberModal.classList.remove('visible'); createMemberForGroupModal.classList.remove('visible');};
-    const handleFileUpload = (file, callback) => { if (file) { const reader = new FileReader(); reader.onload = (e) => callback(e.target.result); reader.readAsDataURL(file); } };
     const pad = (num) => num.toString().padStart(2, '0');
     function createContextMenu(items, x, y) { removeContextMenu(); const menu = document.createElement('div'); menu.className = 'context-menu'; menu.style.left = `${x}px`; menu.style.top = `${y}px`; items.forEach(item => { const menuItem = document.createElement('div'); menuItem.className = 'context-menu-item'; if (item.danger) menuItem.classList.add('danger'); menuItem.textContent = item.label; menuItem.onclick = () => { item.action(); removeContextMenu(); }; menu.appendChild(menuItem); }); document.body.appendChild(menu); document.addEventListener('click', removeContextMenu, { once: true }); }
     function removeContextMenu() { const menu = document.querySelector('.context-menu'); if (menu) menu.remove(); }
@@ -1223,9 +1269,14 @@ function renderTutorialContent() {
                 openChatRoom(currentChatId, currentChatType);
             }
         });
-        chatListContainer.addEventListener('mousedown', (e) => { if (e.button !== 0) return; const chatItem = e.target.closest('.chat-item'); if (!chatItem) return; longPressTimer = setTimeout(() => { handleChatListLongPress(chatItem.dataset.id, chatItem.dataset.type, e.clientX, e.clientY); }, 400); });
-        chatListContainer.addEventListener('mouseup', () => clearTimeout(longPressTimer));
-        chatListContainer.addEventListener('mouseleave', () => clearTimeout(longPressTimer));
+chatListContainer.addEventListener('contextmenu', (e) => {
+    e.preventDefault(); 
+    
+    const chatItem = e.target.closest('.chat-item');
+    if (!chatItem) return;
+    
+    handleChatListLongPress(chatItem.dataset.id, chatItem.dataset.type, e.clientX, e.clientY);
+});
         chatListContainer.addEventListener('touchstart', (e) => { const chatItem = e.target.closest('.chat-item'); if (!chatItem) return; longPressTimer = setTimeout(() => { const touch = e.touches[0]; handleChatListLongPress(chatItem.dataset.id, chatItem.dataset.type, touch.clientX, touch.clientY); }, 400); });
         chatListContainer.addEventListener('touchend', () => clearTimeout(longPressTimer));
         chatListContainer.addEventListener('touchmove', () => clearTimeout(longPressTimer));
@@ -1373,9 +1424,16 @@ function renderTutorialContent() {
                 }
             }
         });
-        messageArea.addEventListener('mousedown', (e) => { if (e.button !== 0 || e.target.id === 'load-more-btn') return; const messageWrapper = e.target.closest('.message-wrapper'); if (!messageWrapper) return; longPressTimer = setTimeout(() => { handleMessageLongPress(messageWrapper, e.clientX, e.clientY); }, 400); });
-        messageArea.addEventListener('mouseup', () => clearTimeout(longPressTimer));
-        messageArea.addEventListener('mouseleave', () => clearTimeout(longPressTimer));
+messageArea.addEventListener('contextmenu', (e) => {
+    e.preventDefault(); 
+
+    if (e.target.id === 'load-more-btn' || isInMultiSelectMode) return;
+    
+    const messageWrapper = e.target.closest('.message-wrapper');
+    if (!messageWrapper) return;
+
+    handleMessageLongPress(messageWrapper, e.clientX, e.clientY);
+});
         messageArea.addEventListener('touchstart', (e) => { if (e.target.id === 'load-more-btn') return; const messageWrapper = e.target.closest('.message-wrapper'); if (!messageWrapper) return; longPressTimer = setTimeout(() => { const touch = e.touches[0]; handleMessageLongPress(messageWrapper, touch.clientX, touch.clientY); }, 400); });
         messageArea.addEventListener('touchend', () => clearTimeout(longPressTimer));
         messageArea.addEventListener('touchmove', () => clearTimeout(longPressTimer));
@@ -2066,15 +2124,21 @@ function renderTutorialContent() {
             stickerFileUpload.value = ''; 
         });
         
-        stickerFileUpload.addEventListener('change', (e) => {
-            if (e.target.files && e.target.files[0]) {
-                handleFileUpload(e.target.files[0], (dataUrl) => {
-                    stickerPreview.innerHTML = `<img src="${dataUrl}" alt="预览">`;
-                    stickerUrlInput.value = ''; 
-                    stickerUrlInput.disabled = true;
-                });
-            }
-        });
+stickerFileUpload.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        try {
+            // 表情包尺寸不需要太大
+            const compressedUrl = await compressImage(file, { quality: 0.8, maxWidth: 200, maxHeight: 200 });
+            stickerPreview.innerHTML = `<img src="${compressedUrl}" alt="预览">`;
+            stickerUrlInput.value = ''; 
+            stickerUrlInput.disabled = true;
+        } catch (error) {
+            console.error('表情包压缩失败:', error);
+            showToast('表情包压缩失败，请重试');
+        }
+    }
+});
 
         editStickerBtn.addEventListener('click', () => {
             if (!currentStickerActionTarget) return;
@@ -2278,19 +2342,54 @@ function renderTutorialContent() {
             settingsSidebar.classList.remove('open');
         });
 
-        document.getElementById('setting-char-avatar-upload').addEventListener('change', (e) => handleFileUpload(e.target.files[0], (url) => document.getElementById('setting-char-avatar-preview').src = url));
-        document.getElementById('setting-my-avatar-upload').addEventListener('change', (e) => handleFileUpload(e.target.files[0], (url) => document.getElementById('setting-my-avatar-preview').src = url));
-        document.getElementById('setting-chat-bg-upload').addEventListener('change', e => {
-            handleFileUpload(e.target.files[0], (url) => {
-                const char = db.characters.find(c => c.id === currentChatId);
-                if (char) {
-                    char.chatBg = url;
-                    chatRoomScreen.style.backgroundImage = `url(${url})`;
-                    saveData();
-                    showToast('聊天背景已更换');
-                }
-            })
-        });
+// 角色头像
+document.getElementById('setting-char-avatar-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        try {
+            const compressedUrl = await compressImage(file, { quality: 0.8, maxWidth: 400, maxHeight: 400 });
+            document.getElementById('setting-char-avatar-preview').src = compressedUrl;
+        } catch (error) {
+            console.error('头像压缩失败:', error);
+            showToast('头像压缩失败，请重试');
+        }
+    }
+});
+
+// 我的头像
+document.getElementById('setting-my-avatar-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        try {
+            const compressedUrl = await compressImage(file, { quality: 0.8, maxWidth: 400, maxHeight: 400 });
+            document.getElementById('setting-my-avatar-preview').src = compressedUrl;
+        } catch (error) {
+            console.error('头像压缩失败:', error);
+            showToast('头像压缩失败，请重试');
+        }
+    }
+});
+
+// 聊天背景
+document.getElementById('setting-chat-bg-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const char = db.characters.find(c => c.id === currentChatId);
+        if (char) {
+            try {
+                // 背景图可以稍微大一点，质量高一点
+                const compressedUrl = await compressImage(file, { quality: 0.85, maxWidth: 1080, maxHeight: 1920 });
+                char.chatBg = compressedUrl;
+                chatRoomScreen.style.backgroundImage = `url(${compressedUrl})`;
+                saveData();
+                showToast('聊天背景已更换');
+            } catch (error) {
+                console.error('背景压缩失败:', error);
+                showToast('背景压缩失败，请重试');
+            }
+        }
+    }
+});
         clearChatHistoryBtn.addEventListener('click', () => {
             const character = db.characters.find(c => c.id === currentChatId);
             if (!character) return;
@@ -2321,9 +2420,13 @@ function renderTutorialContent() {
             worldBookSelectionModal.classList.add('visible');
         });
         worldBookSelectionModal.addEventListener('click', e => {
-            if(e.target === worldBookSelectionModal) worldBookSelectionModal.classList.remove('visible');
+            if (e.target === worldBookSelectionModal) {
+                worldBookSelectionModal.classList.remove('visible');
+            }
+            e.stopPropagation(); // <-- 新增这一行
         });
-        saveWorldBookSelectionBtn.addEventListener('click', () => {
+saveWorldBookSelectionBtn.addEventListener('click', (e) => { // 1. 接收事件对象 e
+    e.stopPropagation(); // 2. 阻止事件冒泡
             const character = db.characters.find(c => c.id === currentChatId);
             if (!character) return;
             const selectedIds = Array.from(worldBookSelectionList.querySelectorAll('input:checked')).map(input => input.value);
@@ -2336,7 +2439,22 @@ function renderTutorialContent() {
     function loadSettingsToSidebar(){const e=db.characters.find(e=>e.id===currentChatId);e&&(document.getElementById('setting-char-avatar-preview').src=e.avatar,document.getElementById('setting-char-remark').value=e.remarkName,document.getElementById('setting-char-persona').value=e.persona,document.getElementById('setting-my-avatar-preview').src=e.myAvatar,document.getElementById('setting-my-name').value=e.myName,document.getElementById('setting-my-persona').value=e.myPersona,document.getElementById('setting-theme-color').value=e.theme||'white_pink',document.getElementById('setting-max-memory').value=e.maxMemory)}
     function saveSettingsFromSidebar(){const e=db.characters.find(e=>e.id===currentChatId);e&&(e.avatar=document.getElementById('setting-char-avatar-preview').src,e.remarkName=document.getElementById('setting-char-remark').value,e.persona=document.getElementById('setting-char-persona').value,e.myAvatar=document.getElementById('setting-my-avatar-preview').src,e.myName=document.getElementById('setting-my-name').value,e.myPersona=document.getElementById('setting-my-persona').value,e.theme=document.getElementById('setting-theme-color').value,e.maxMemory=document.getElementById('setting-max-memory').value,saveData(),showToast('设置已保存！'),chatRoomTitle.textContent=e.remarkName,renderChatList(),currentPage=1,renderMessages(false, true))}
     function setupApiSettingsApp(){const e=document.getElementById('api-form'),t=document.getElementById('fetch-models-btn'),a=document.getElementById('api-model'),n=document.getElementById('api-provider'),r=document.getElementById('api-url'),s=document.getElementById('api-key'),c={newapi:'',deepseek:'https://api.deepseek.com',claude:'https://api.anthropic.com',gemini:'https://generativelanguage.googleapis.com'};db.apiSettings&&(n.value=db.apiSettings.provider||'newapi',r.value=db.apiSettings.url||'',s.value=db.apiSettings.key||'',db.apiSettings.model&&(a.innerHTML=`<option value="${db.apiSettings.model}">${db.apiSettings.model}</option>`));n.addEventListener('change',()=>{r.value=c[n.value]||''});t.addEventListener('click',async()=>{const o=n.value;let l=r.value.trim();const i=s.value.trim();if(!l||!i)return showToast('请先填写API地址和密钥！');l.endsWith('/')&&(l=l.slice(0,-1));const d='gemini'===o?`${l}/v1beta/models?key=${i}`:`${l}/v1/models`;t.classList.add('loading'),t.disabled=!0;try{const g='gemini'===o?{}:{Authorization:`Bearer ${i}`},u=await fetch(d,{method:'GET',headers:g});if(!u.ok)throw new Error(`网络响应错误: ${u.status}`);const p=await u.json();let f=[];'gemini'!==o&&p.data?f=p.data.map(e=>e.id):'gemini'===o&&p.models&&(f=p.models.map(e=>e.name.replace('models/',''))),a.innerHTML='',f.length>0?f.forEach(e=>{const t=document.createElement('option');t.value=e,t.textContent=e,a.appendChild(t)}):a.innerHTML='<option value="">未找到任何模型</option>',showToast('模型列表拉取成功！')}catch(h){showToast(`拉取失败: ${h.message}`),a.innerHTML='<option value="">拉取失败</option>'}finally{t.classList.remove('loading'),t.disabled=!1}});e.addEventListener('submit',e=>{e.preventDefault();if(!a.value)return showToast('请选择模型后保存！');db.apiSettings={provider:n.value,url:r.value,key:s.value,model:a.value},saveData(),showToast('API设置已保存！')})}
-    function setupWallpaperApp(){const e=document.getElementById('wallpaper-upload'),t=document.getElementById('wallpaper-preview');t.style.backgroundImage=`url(${db.wallpaper})`,t.textContent='',e.addEventListener('change',e=>handleFileUpload(e.target.files[0],a=>{db.wallpaper=a,applyWallpaper(a),t.style.backgroundImage=`url(${a})`,saveData(),showToast('壁纸更换成功！')}))}
+    function setupWallpaperApp(){const e=document.getElementById('wallpaper-upload'),t=document.getElementById('wallpaper-preview');t.style.backgroundImage=`url(${db.wallpaper})`,t.textContent='',e.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        try {
+            const compressedUrl = await compressImage(file, { quality: 0.85, maxWidth: 1080, maxHeight: 1920 });
+            db.wallpaper = compressedUrl;
+            applyWallpaper(compressedUrl);
+            t.style.backgroundImage = `url(${compressedUrl})`;
+            saveData();
+            showToast('壁纸更换成功！');
+        } catch (error) {
+            console.error('壁纸压缩失败:', error);
+            showToast('壁纸压缩失败，请重试');
+        }
+    }
+});}
     
     // --- GROUP CHAT FUNCTIONS ---
     function setupGroupChatSystem() {
@@ -2359,18 +2477,41 @@ function renderTutorialContent() {
 
         groupSettingsForm.addEventListener('submit', e => { e.preventDefault(); saveGroupSettingsFromSidebar(); groupSettingsSidebar.classList.remove('open'); });
         
-        document.getElementById('setting-group-avatar-upload').addEventListener('change', e => {
-            handleFileUpload(e.target.files[0], url => {
-                const group = db.groups.find(g => g.id === currentChatId);
-                if (group) {
-                    group.avatar = url;
-                    document.getElementById('setting-group-avatar-preview').src = url;
-                    // No need to save immediately, will be saved with the form
-                }
-            })
-        });
+document.getElementById('setting-group-avatar-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        try {
+            const compressedUrl = await compressImage(file, { quality: 0.8, maxWidth: 400, maxHeight: 400 });
+            const group = db.groups.find(g => g.id === currentChatId);
+            if (group) {
+                group.avatar = compressedUrl;
+                document.getElementById('setting-group-avatar-preview').src = compressedUrl;
+            }
+        } catch (error) {
+            console.error('群头像压缩失败:', error);
+            showToast('群头像压缩失败，请重试');
+        }
+    }
+});
 
-        document.getElementById('setting-group-chat-bg-upload').addEventListener('change', e => { handleFileUpload(e.target.files[0], url => { const group = db.groups.find(g => g.id === currentChatId); if (group) { group.chatBg = url; chatRoomScreen.style.backgroundImage = `url(${url})`; saveData(); showToast('聊天背景已更换'); } }); });
+document.getElementById('setting-group-chat-bg-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        try {
+            const compressedUrl = await compressImage(file, { quality: 0.85, maxWidth: 1080, maxHeight: 1920 });
+            const group = db.groups.find(g => g.id === currentChatId);
+            if (group) {
+                group.chatBg = compressedUrl;
+                chatRoomScreen.style.backgroundImage = `url(${compressedUrl})`;
+                saveData();
+                showToast('聊天背景已更换');
+            }
+        } catch (error) {
+            console.error('群聊背景压缩失败:', error);
+            showToast('群聊背景压缩失败，请重试');
+        }
+    }
+});
         document.getElementById('clear-group-chat-history-btn').addEventListener('click', () => { const group = db.groups.find(g => g.id === currentChatId); if (!group) return; if (confirm(`你确定要清空群聊“${group.name}”的所有聊天记录吗？这个操作是不可恢复的！`)) { group.history = []; saveData(); renderMessages(false, true); renderChatList(); groupSettingsSidebar.classList.remove('open'); showToast('聊天记录已清空'); } });
         
         groupMembersListContainer.addEventListener('click', e => {
@@ -2382,7 +2523,18 @@ function renderTutorialContent() {
         
         editGroupMemberModal.addEventListener('click', e => { if (e.target === editGroupMemberModal) editGroupMemberModal.classList.remove('visible'); });
         document.getElementById('edit-member-avatar-preview').addEventListener('click', () => { document.getElementById('edit-member-avatar-upload').click(); });
-        document.getElementById('edit-member-avatar-upload').addEventListener('change', e => { handleFileUpload(e.target.files[0], url => { document.getElementById('edit-member-avatar-preview').src = url; }); });
+document.getElementById('edit-member-avatar-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        try {
+            const compressedUrl = await compressImage(file, { quality: 0.8, maxWidth: 400, maxHeight: 400 });
+            document.getElementById('edit-member-avatar-preview').src = compressedUrl;
+        } catch (error) {
+            console.error('成员头像压缩失败:', error);
+            showToast('成员头像压缩失败，请重试');
+        }
+    }
+});
         editGroupMemberForm.addEventListener('submit', e => {
             e.preventDefault();
             const memberId = document.getElementById('editing-member-id').value;
@@ -2420,7 +2572,18 @@ function renderTutorialContent() {
         createMemberForGroupModal.addEventListener('click', e => { if (e.target === createMemberForGroupModal) createMemberForGroupModal.classList.remove('visible'); });
         
         document.getElementById('create-group-member-avatar-preview').addEventListener('click', () => { document.getElementById('create-group-member-avatar-upload').click(); });
-        document.getElementById('create-group-member-avatar-upload').addEventListener('change', e => { handleFileUpload(e.target.files[0], url => { document.getElementById('create-group-member-avatar-preview').src = url; }); });
+document.getElementById('create-group-member-avatar-upload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        try {
+            const compressedUrl = await compressImage(file, { quality: 0.8, maxWidth: 400, maxHeight: 400 });
+            document.getElementById('create-group-member-avatar-preview').src = compressedUrl;
+        } catch (error) {
+            console.error('新成员头像压缩失败:', error);
+            showToast('新成员头像压缩失败，请重试');
+        }
+    }
+});
 
         confirmInviteBtn.addEventListener('click', () => {
             const group = db.groups.find(g => g.id === currentChatId);
