@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>章鱼喷墨机</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/kGYP6CQw/6.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
         /* --- 全局与主题样式 --- */
         :root {
@@ -1473,7 +1476,19 @@ messageArea.addEventListener('contextmenu', (e) => {
     function enterMultiSelectMode(initialMessageId) { isInMultiSelectMode = true; chatRoomHeaderDefault.style.display = 'none'; chatRoomHeaderSelect.style.display = 'flex'; document.querySelector('.chat-input-wrapper').style.display='none'; multiSelectBar.classList.add('visible'); chatRoomScreen.classList.add('multi-select-active'); selectedMessageIds.clear(); if (initialMessageId) { toggleMessageSelection(initialMessageId); } }
     function exitMultiSelectMode() { isInMultiSelectMode = false; chatRoomHeaderDefault.style.display = 'flex'; chatRoomHeaderSelect.style.display = 'none'; document.querySelector('.chat-input-wrapper').style.display='block'; multiSelectBar.classList.remove('visible'); chatRoomScreen.classList.remove('multi-select-active'); selectedMessageIds.forEach(id => { const el = messageArea.querySelector(`.message-wrapper[data-id="${id}"]`); if (el) el.classList.remove('multi-select-selected'); }); selectedMessageIds.clear(); }
     function toggleMessageSelection(messageId) { const el = messageArea.querySelector(`.message-wrapper[data-id="${messageId}"]`); if (!el) return; if (selectedMessageIds.has(messageId)) { selectedMessageIds.delete(messageId); el.classList.remove('multi-select-selected'); } else { selectedMessageIds.add(messageId); el.classList.add('multi-select-selected'); } selectCount.textContent = `已选择 ${selectedMessageIds.size} 项`; deleteSelectedBtn.disabled = selectedMessageIds.size === 0; }
-    function deleteSelectedMessages() { if (selectedMessageIds.size === 0) return; const chat = (currentChatType === 'private') ? db.characters.find(c => c.id === currentChatId) : db.groups.find(g => g.id === currentChatId); chat.history = chat.history.filter(m => !selectedMessageIds.has(m.id)); saveData(); currentPage = 1; renderMessages(false, true); renderChatList(); exitMultiSelectMode(); showToast(`已删除 ${selectedMessageIds.size} 条消息`); }
+function deleteSelectedMessages() {
+    if (selectedMessageIds.size === 0) return;
+    const deletedCount = selectedMessageIds.size; 
+
+    const chat = (currentChatType === 'private') ? db.characters.find(c => c.id === currentChatId) : db.groups.find(g => g.id === currentChatId);
+    chat.history = chat.history.filter(m => !selectedMessageIds.has(m.id));
+    saveData();
+    currentPage = 1;
+    renderMessages(false, true);
+    renderChatList();
+    exitMultiSelectMode();
+    showToast(`已删除 ${deletedCount} 条消息`); 
+}
     
     function openChatRoom(chatId, type) {
         const chat = (type === 'private') ? db.characters.find(c => c.id === chatId) : db.groups.find(g => g.id === chatId);
@@ -2521,7 +2536,12 @@ document.getElementById('setting-group-chat-bg-upload').addEventListener('change
             else if (addBtn) { addMemberActionSheet.classList.add('visible'); }
         });
         
-        editGroupMemberModal.addEventListener('click', e => { if (e.target === editGroupMemberModal) editGroupMemberModal.classList.remove('visible'); });
+editGroupMemberModal.addEventListener('click', e => { 
+    e.stopPropagation(); 
+    if (e.target === editGroupMemberModal) {
+        editGroupMemberModal.classList.remove('visible');
+    }
+});
         document.getElementById('edit-member-avatar-preview').addEventListener('click', () => { document.getElementById('edit-member-avatar-upload').click(); });
 document.getElementById('edit-member-avatar-upload').addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -2568,7 +2588,12 @@ document.getElementById('edit-member-avatar-upload').addEventListener('change', 
             createMemberForGroupModal.classList.add('visible');
             addMemberActionSheet.classList.remove('visible');
         });
-        inviteMemberModal.addEventListener('click', e => { if (e.target === inviteMemberModal) inviteMemberModal.classList.remove('visible'); });
+inviteMemberModal.addEventListener('click', e => {
+    e.stopPropagation();
+    if (e.target === inviteMemberModal) {
+        inviteMemberModal.classList.remove('visible');
+    }
+});
         createMemberForGroupModal.addEventListener('click', e => { if (e.target === createMemberForGroupModal) createMemberForGroupModal.classList.remove('visible'); });
         
         document.getElementById('create-group-member-avatar-preview').addEventListener('click', () => { document.getElementById('create-group-member-avatar-upload').click(); });
@@ -2608,38 +2633,46 @@ document.getElementById('create-group-member-avatar-upload').addEventListener('c
             inviteMemberModal.classList.remove('visible');
         });
 
-        createMemberForGroupForm.addEventListener('submit', e => {
-            e.preventDefault();
-            const group = db.groups.find(g => g.id === currentChatId);
-            if (!group) return;
+createMemberForGroupForm.addEventListener('submit', e => {
+    e.preventDefault();
+    const group = db.groups.find(g => g.id === currentChatId);
+    if (!group) return;
 
-            const newChar = {
-                id: `char_${Date.now()}`,
-                realName: document.getElementById('create-group-member-realname').value,
-                remarkName: document.getElementById('create-group-member-nickname').value,
-                persona: document.getElementById('create-group-member-persona').value,
-                avatar: document.getElementById('create-group-member-avatar-preview').src,
-                myName: '你', myPersona: '', myAvatar: 'https://i.postimg.cc/GtbTnxhP/o-o-1.jpg',
-                theme: 'white_pink', maxMemory: 10, chatBg: '', history: [], isPinned: false, status: '在线', worldBookIds: []
-            };
-            db.characters.push(newChar);
+    const newMember = {
+        id: `member_group_only_${Date.now()}`, 
+        originalCharId: null, 
+        realName: document.getElementById('create-group-member-realname').value,
+        groupNickname: document.getElementById('create-group-member-nickname').value,
+        persona: document.getElementById('create-group-member-persona').value,
+        avatar: document.getElementById('create-group-member-avatar-preview').src,
+    };
 
-            const newMember = { id: `member_${newChar.id}`, originalCharId: newChar.id, realName: newChar.realName, groupNickname: newChar.remarkName, persona: newChar.persona, avatar: newChar.avatar };
-            group.members.push(newMember);
-            
-            sendInviteNotification(group, newMember.realName);
-            
-            saveData();
-            renderGroupMembersInSettings(group);
-            renderMessages(false, true);
-            renderChatList();
-            showToast(`新成员 ${newMember.groupNickname} 已加入`);
-            createMemberForGroupModal.classList.remove('visible');
-        });
+    group.members.push(newMember);
+    
+    sendInviteNotification(group, newMember.realName);
+    
+    saveData();
+    renderGroupMembersInSettings(group);
+    renderMessages(false, true);
+    showToast(`新成员 ${newMember.groupNickname} 已加入`);
+    createMemberForGroupModal.classList.remove('visible');
+});
 
         document.getElementById('setting-group-my-avatar-upload').addEventListener('change', (e) => handleFileUpload(e.target.files[0], (url) => {
             document.getElementById('setting-group-my-avatar-preview').src = url;
         }));
+addMemberActionSheet.addEventListener('click', e => {
+    e.stopPropagation();
+    if (e.target === addMemberActionSheet) {
+        addMemberActionSheet.classList.remove('visible');
+    }
+});
+createMemberForGroupModal.addEventListener('click', e => {
+    e.stopPropagation();
+    if (e.target === createMemberForGroupModal) {
+        createMemberForGroupModal.classList.remove('visible');
+    }
+});
     }
 
     function renderMemberSelectionList() {
