@@ -2689,6 +2689,14 @@
             messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !isGenerating) sendMessage(); });
             getReplyBtn.addEventListener('click', getAiReply);
             messageArea.addEventListener('click', (e) => {
+                // --- 修复开始: 增加关闭表情包面板的逻辑 ---
+                if (stickerModal.classList.contains('visible')) {
+                    stickerModal.classList.remove('visible');
+                    // 阻止事件继续传播，避免立即触发其他点击效果
+                    return; 
+                }
+                // --- 修复结束 ---
+
                 if (e.target && e.target.id === 'load-more-btn') { loadMoreMessages(); }
                 else if (isInMultiSelectMode) {
                     const messageWrapper = e.target.closest('.message-wrapper');
