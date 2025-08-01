@@ -212,6 +212,13 @@
             color: #666;
         }
 
+        #home-screen.day-mode .time-widget,
+        #home-screen.day-mode .time-widget .date,
+        #home-screen.day-mode .app-icon .app-name {
+            color: var(--white-color);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
         .app-grid {
             width: 100%;
             padding: 20px 40px;
@@ -1916,6 +1923,21 @@
                     <hr style="border:none; border-top:1px solid #eee; margin: 20px 0;">
                     <div class="form-group"><button type="button" class="btn btn-secondary" id="link-world-book-btn">关联世界书</button></div>
                     <div class="form-group"><label for="setting-theme-color">主题颜色 (对方/我方)</label><select id="setting-theme-color"></select></div>
+                    
+                    <!-- NEW: Custom Bubble CSS Section -->
+                    <hr style="border:none; border-top:1px solid #eee; margin: 20px 0;">
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label for="setting-use-custom-css" style="margin-bottom:0;">自定义气泡样式</label>
+                            <input type="checkbox" id="setting-use-custom-css" style="width: auto;">
+                        </div>
+                        <div id="private-bubble-css-preview" class="bubble-css-preview" style="background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Preview bubbles will be generated here by JS -->
+                        </div>
+                        <textarea id="setting-custom-bubble-css" rows="6" placeholder="在此输入CSS代码...&#10;例如：&#10;.message-bubble.sent { background-color: #A5D6A7; }&#10;.message-bubble.received { background-color: #E1E1E1; }" disabled></textarea>
+                        <button type="button" class="btn btn-neutral" id="reset-custom-bubble-css-btn" style="margin-top: 10px; width: auto; padding: 5px 15px; font-size: 14px;">恢复默认</button>
+                    </div>
+                    
                     <div class="form-group"><label for="setting-max-memory">最大记忆轮数</label><input type="number" id="setting-max-memory" value="10" min="1"></div>
                     <div class="form-group"><label for="setting-chat-bg-upload" class="btn btn-primary">更换聊天背景</label><input type="file" id="setting-chat-bg-upload" accept="image/*" style="display:none;"></div><button type="submit" class="btn btn-primary">保存设置</button>
                 </form>
@@ -1981,6 +2003,21 @@
                     </div>
                     <hr style="border:none; border-top:1px solid #eee; margin: 20px 0;">
                     <div class="form-group"><label for="setting-group-theme-color">主题颜色 (对方/我方)</label><select id="setting-group-theme-color"></select></div>
+
+                    <!-- NEW: Group Custom Bubble CSS Section -->
+                    <hr style="border:none; border-top:1px solid #eee; margin: 20px 0;">
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label for="setting-group-use-custom-css" style="margin-bottom:0;">自定义气泡样式</label>
+                            <input type="checkbox" id="setting-group-use-custom-css" style="width: auto;">
+                        </div>
+                        <div id="group-bubble-css-preview" class="bubble-css-preview" style="background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Preview bubbles will be generated here by JS -->
+                        </div>
+                        <textarea id="setting-group-custom-bubble-css" rows="6" placeholder="在此输入CSS代码...&#10;例如：&#10;.message-bubble.sent { background-color: #A5D6A7; }&#10;.message-bubble.received { background-color: #E1E1E1; }" disabled></textarea>
+                        <button type="button" class="btn btn-neutral" id="reset-group-custom-bubble-css-btn" style="margin-top: 10px; width: auto; padding: 5px 15px; font-size: 14px;">恢复默认</button>
+                    </div>
+
                     <div class="form-group"><label for="setting-group-max-memory">最大记忆轮数</label><input type="number" id="setting-group-max-memory" value="10" min="1"></div>
                     <div class="form-group"><label for="setting-group-chat-bg-upload" class="btn btn-primary">更换聊天背景</label><input type="file" id="setting-group-chat-bg-upload" accept="image/*" style="display:none;"></div>
                     <button type="submit" class="btn btn-primary">保存设置</button>
@@ -2425,9 +2462,13 @@
                     if (c.isPinned === undefined) c.isPinned = false;
                     if (c.status === undefined) c.status = '在线';
                     if (!c.worldBookIds) c.worldBookIds = [];
+                    if (c.customBubbleCss === undefined) c.customBubbleCss = '';
+                    if (c.useCustomBubbleCss === undefined) c.useCustomBubbleCss = false;
                 });
                 db.groups.forEach(g => {
                     if (g.isPinned === undefined) g.isPinned = false;
+                    if (g.customBubbleCss === undefined) g.customBubbleCss = '';
+                    if (g.useCustomBubbleCss === undefined) g.useCustomBubbleCss = false;
                 });
             };
             const showToast = (message) => {
@@ -2484,6 +2525,82 @@
                 const menu = document.querySelector('.context-menu');
                 if (menu) menu.remove();
             }
+
+            // --- NEW: Function to manage custom bubble styles ---
+            function updateCustomBubbleStyle(chatId, css, enabled) {
+                const styleId = `custom-bubble-style-for-${chatId}`;
+                let styleElement = document.getElementById(styleId);
+
+                if (enabled && css) {
+                    if (!styleElement) {
+                        styleElement = document.createElement('style');
+                        styleElement.id = styleId;
+                        document.head.appendChild(styleElement);
+                    }
+                    // 修正: 更新正则表达式，使其也能匹配到单独的 .message-bubble 类，
+                    // 防止未指定 .sent 或 .received 的样式污染到其他聊天。
+                    // The original regex only matched ".message-bubble.sent" or ".message-bubble.received".
+                    // This new regex also matches the base ".message-bubble" class.
+                    const scopedCss = css.replace(/(\.message-bubble(?:\.sent|\.received)?)/g, `#chat-room-screen.chat-active-${chatId} $1`);
+                    styleElement.innerHTML = scopedCss;
+                } else {
+                    if (styleElement) {
+                        styleElement.remove();
+                    }
+                }
+            }
+
+
+            // --- NEW: Function to update bubble CSS preview in settings ---
+            function updateBubbleCssPreview(previewContainer, css, useDefault, theme) {
+                previewContainer.innerHTML = ''; // Clear previous preview
+
+                const sentBubble = document.createElement('div');
+                sentBubble.className = 'message-bubble sent';
+                sentBubble.textContent = '这是我方气泡。';
+                sentBubble.style.alignSelf = 'flex-end';
+                sentBubble.style.borderBottomRightRadius = '5px';
+
+                const receivedBubble = document.createElement('div');
+                receivedBubble.className = 'message-bubble received';
+                receivedBubble.textContent = '这是对方气泡。';
+                receivedBubble.style.alignSelf = 'flex-start';
+                receivedBubble.style.borderBottomLeftRadius = '5px';
+
+                // Apply base styles common to all previews
+                [sentBubble, receivedBubble].forEach(bubble => {
+                    bubble.style.maxWidth = '70%';
+                    bubble.style.padding = '8px 12px';
+                    bubble.style.wordWrap = 'break-word';
+                    bubble.style.lineHeight = '1.4';
+                });
+
+                if (useDefault || !css) {
+                    // Apply theme styles directly
+                    sentBubble.style.backgroundColor = theme.sent.bg;
+                    sentBubble.style.color = theme.sent.text;
+                    sentBubble.style.borderRadius = '18px';
+                    sentBubble.style.borderBottomRightRadius = '5px';
+
+                    receivedBubble.style.backgroundColor = theme.received.bg;
+                    receivedBubble.style.color = theme.received.text;
+                    receivedBubble.style.borderRadius = '18px';
+                    receivedBubble.style.borderBottomLeftRadius = '5px';
+                } else {
+                    // Use a style tag to apply custom css within the preview. This is safer.
+                    const styleTag = document.createElement('style');
+                    // 修正: 更新正则表达式，使其在预览中也能正确处理单独的 .message-bubble 类。
+                    // The original regex only matched ".message-bubble.sent" or ".message-bubble.received".
+                    // This new regex also matches the base ".message-bubble" class for the preview.
+                    const scopedCss = css.replace(/(\.message-bubble(?:\.sent|\.received)?)/g, `#${previewContainer.id} $1`);
+                    styleTag.textContent = scopedCss;
+                    previewContainer.appendChild(styleTag);
+                }
+
+                previewContainer.appendChild(receivedBubble);
+                previewContainer.appendChild(sentBubble);
+            }
+
             const init = () => {
                 loadData();
                 document.body.addEventListener('click', (e) => {
@@ -2873,7 +2990,9 @@
                         history: [],
                         isPinned: false,
                         status: '在线',
-                        worldBookIds: []
+                        worldBookIds: [],
+                        useCustomBubbleCss: false,
+                        customBubbleCss: ''
                     };
                     db.characters.push(newChar);
                     saveData();
@@ -3116,6 +3235,13 @@
                 isGenerating = false;
                 getReplyBtn.disabled = false;
                 currentPage = 1;
+
+                // --- NEW: Add chat-specific class and apply custom CSS ---
+                chatRoomScreen.className = chatRoomScreen.className.replace(/\bchat-active-[^ ]+\b/g, '');
+                chatRoomScreen.classList.add(`chat-active-${chatId}`);
+                updateCustomBubbleStyle(chatId, chat.customBubbleCss, chat.useCustomBubbleCss);
+
+
                 renderMessages(false, true);
                 switchScreen('chat-room-screen');
             }
@@ -3297,8 +3423,11 @@
                     const duration = calculateVoiceDuration(voiceText);
                     bubbleElement = document.createElement('div');
                     bubbleElement.className = 'voice-bubble';
-                    bubbleElement.style.backgroundColor = bubbleTheme.bg;
-                    bubbleElement.style.color = bubbleTheme.text;
+                    // --- MODIFICATION: Apply theme only if custom CSS is off ---
+                    if (!chat.useCustomBubbleCss) {
+                        bubbleElement.style.backgroundColor = bubbleTheme.bg;
+                        bubbleElement.style.color = bubbleTheme.text;
+                    }
                     const playIconSvg = `<svg class="play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>`;
                     const durationSpan = `<span class="duration">${duration}"</span>`;
                     bubbleElement.innerHTML = `${playIconSvg}${durationSpan}`;
@@ -3355,15 +3484,21 @@
                         bubbleElement = document.createElement('div');
                         bubbleElement.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
                         bubbleElement.textContent = textContent;
-                        bubbleElement.style.backgroundColor = bubbleTheme.bg;
-                        bubbleElement.style.color = bubbleTheme.text;
+                        // --- MODIFICATION: Apply theme only if custom CSS is off ---
+                        if (!chat.useCustomBubbleCss) {
+                            bubbleElement.style.backgroundColor = bubbleTheme.bg;
+                            bubbleElement.style.color = bubbleTheme.text;
+                        }
                     }
                 } else {
                     bubbleElement = document.createElement('div');
                     bubbleElement.className = `message-bubble ${isSent ? 'sent' : 'received'}`;
                     bubbleElement.textContent = content;
-                    bubbleElement.style.backgroundColor = bubbleTheme.bg;
-                    bubbleElement.style.color = bubbleTheme.text;
+                    // --- MODIFICATION: Apply theme only if custom CSS is off ---
+                    if (!chat.useCustomBubbleCss) {
+                        bubbleElement.style.backgroundColor = bubbleTheme.bg;
+                        bubbleElement.style.color = bubbleTheme.text;
+                    }
                 }
 
                 const nicknameHTML = (currentChatType === 'group' && !isSent && senderNickname) ?
@@ -4374,6 +4509,45 @@
                     settingsSidebar.classList.remove('open');
                 });
 
+                // --- NEW: Private Chat Custom CSS Logic ---
+                const useCustomCssCheckbox = document.getElementById('setting-use-custom-css');
+                const customCssTextarea = document.getElementById('setting-custom-bubble-css');
+                const resetCustomCssBtn = document.getElementById('reset-custom-bubble-css-btn');
+                const privatePreviewBox = document.getElementById('private-bubble-css-preview');
+
+                useCustomCssCheckbox.addEventListener('change', (e) => {
+                    customCssTextarea.disabled = !e.target.checked;
+                    const char = db.characters.find(c => c.id === currentChatId);
+                    if (char) {
+                        const themeKey = char.theme || 'white_pink';
+                        const theme = colorThemes[themeKey];
+                        updateBubbleCssPreview(privatePreviewBox, customCssTextarea.value, !e.target.checked, theme);
+                    }
+                });
+
+                customCssTextarea.addEventListener('input', (e) => {
+                    const char = db.characters.find(c => c.id === currentChatId);
+                    if (char && useCustomCssCheckbox.checked) {
+                        const themeKey = char.theme || 'white_pink';
+                        const theme = colorThemes[themeKey];
+                        updateBubbleCssPreview(privatePreviewBox, e.target.value, false, theme);
+                    }
+                });
+
+                resetCustomCssBtn.addEventListener('click', () => {
+                    const char = db.characters.find(c => c.id === currentChatId);
+                    if (char) {
+                        customCssTextarea.value = '';
+                        useCustomCssCheckbox.checked = false;
+                        customCssTextarea.disabled = true;
+                        const themeKey = char.theme || 'white_pink';
+                        const theme = colorThemes[themeKey];
+                        updateBubbleCssPreview(privatePreviewBox, '', true, theme);
+                        showToast('样式已重置为默认');
+                    }
+                });
+
+
                 // 角色头像
                 document.getElementById('setting-char-avatar-upload').addEventListener('change', async (e) => {
                     const file = e.target.files[0];
@@ -4492,6 +4666,19 @@
                     document.getElementById('setting-my-persona').value = e.myPersona;
                     document.getElementById('setting-theme-color').value = e.theme || 'white_pink';
                     document.getElementById('setting-max-memory').value = e.maxMemory;
+
+                    // --- NEW: Load custom CSS settings ---
+                    const useCustomCssCheckbox = document.getElementById('setting-use-custom-css');
+                    const customCssTextarea = document.getElementById('setting-custom-bubble-css');
+                    const privatePreviewBox = document.getElementById('private-bubble-css-preview');
+
+                    useCustomCssCheckbox.checked = e.useCustomBubbleCss || false;
+                    customCssTextarea.value = e.customBubbleCss || '';
+                    customCssTextarea.disabled = !useCustomCssCheckbox.checked;
+
+                    const themeKey = e.theme || 'white_pink';
+                    const theme = colorThemes[themeKey];
+                    updateBubbleCssPreview(privatePreviewBox, e.customBubbleCss, !e.useCustomBubbleCss, theme);
                 }
             }
 
@@ -4506,10 +4693,17 @@
                     e.myPersona = document.getElementById('setting-my-persona').value;
                     e.theme = document.getElementById('setting-theme-color').value;
                     e.maxMemory = document.getElementById('setting-max-memory').value;
+                    // --- NEW: Save custom CSS settings ---
+                    e.useCustomBubbleCss = document.getElementById('setting-use-custom-css').checked;
+                    e.customBubbleCss = document.getElementById('setting-custom-bubble-css').value;
+
                     saveData();
                     showToast('设置已保存！');
                     chatRoomTitle.textContent = e.remarkName;
                     renderChatList();
+
+                    // --- NEW: Re-apply styles and re-render messages ---
+                    updateCustomBubbleStyle(currentChatId, e.customBubbleCss, e.useCustomBubbleCss);
                     currentPage = 1;
                     renderMessages(false, true);
                 }
@@ -4638,7 +4832,9 @@
                         maxMemory: 10,
                         chatBg: '',
                         history: [],
-                        isPinned: false
+                        isPinned: false,
+                        useCustomBubbleCss: false,
+                        customBubbleCss: ''
                     };
                     db.groups.push(newGroup);
                     saveData();
@@ -4652,6 +4848,46 @@
                     saveGroupSettingsFromSidebar();
                     groupSettingsSidebar.classList.remove('open');
                 });
+
+
+                // --- NEW: Group Chat Custom CSS Logic ---
+                const useGroupCustomCssCheckbox = document.getElementById('setting-group-use-custom-css');
+                const groupCustomCssTextarea = document.getElementById('setting-group-custom-bubble-css');
+                const resetGroupCustomCssBtn = document.getElementById('reset-group-custom-bubble-css-btn');
+                const groupPreviewBox = document.getElementById('group-bubble-css-preview');
+
+                useGroupCustomCssCheckbox.addEventListener('change', (e) => {
+                    groupCustomCssTextarea.disabled = !e.target.checked;
+                    const group = db.groups.find(g => g.id === currentChatId);
+                    if (group) {
+                        const themeKey = group.theme || 'white_pink';
+                        const theme = colorThemes[themeKey];
+                        updateBubbleCssPreview(groupPreviewBox, groupCustomCssTextarea.value, !e.target.checked, theme);
+                    }
+                });
+
+                groupCustomCssTextarea.addEventListener('input', (e) => {
+                    const group = db.groups.find(g => g.id === currentChatId);
+                    if (group && useGroupCustomCssCheckbox.checked) {
+                        const themeKey = group.theme || 'white_pink';
+                        const theme = colorThemes[themeKey];
+                        updateBubbleCssPreview(groupPreviewBox, e.target.value, false, theme);
+                    }
+                });
+
+                resetGroupCustomCssBtn.addEventListener('click', () => {
+                    const group = db.groups.find(g => g.id === currentChatId);
+                    if (group) {
+                        groupCustomCssTextarea.value = '';
+                        useGroupCustomCssCheckbox.checked = false;
+                        groupCustomCssTextarea.disabled = true;
+                        const themeKey = group.theme || 'white_pink';
+                        const theme = colorThemes[themeKey];
+                        updateBubbleCssPreview(groupPreviewBox, '', true, theme);
+                        showToast('样式已重置为默认');
+                    }
+                });
+
 
                 document.getElementById('setting-group-avatar-upload').addEventListener('change', async (e) => {
                     const file = e.target.files[0];
@@ -4913,6 +5149,19 @@
                 themeSelect.value = group.theme || 'white_pink';
                 document.getElementById('setting-group-max-memory').value = group.maxMemory;
                 renderGroupMembersInSettings(group);
+
+                // --- NEW: Load group custom CSS settings ---
+                const useGroupCustomCssCheckbox = document.getElementById('setting-group-use-custom-css');
+                const groupCustomCssTextarea = document.getElementById('setting-group-custom-bubble-css');
+                const groupPreviewBox = document.getElementById('group-bubble-css-preview');
+
+                useGroupCustomCssCheckbox.checked = group.useCustomBubbleCss || false;
+                groupCustomCssTextarea.value = group.customBubbleCss || '';
+                groupCustomCssTextarea.disabled = !useGroupCustomCssCheckbox.checked;
+
+                const themeKey = group.theme || 'white_pink';
+                const theme = colorThemes[themeKey];
+                updateBubbleCssPreview(groupPreviewBox, group.customBubbleCss, !group.useCustomBubbleCss, theme);
             }
 
             function renderGroupMembersInSettings(group) {
@@ -4947,6 +5196,13 @@
                 group.me.persona = document.getElementById('setting-group-my-persona').value;
                 group.theme = document.getElementById('setting-group-theme-color').value;
                 group.maxMemory = document.getElementById('setting-group-max-memory').value;
+
+                // --- NEW: Save group custom CSS settings ---
+                group.useCustomBubbleCss = document.getElementById('setting-group-use-custom-css').checked;
+                group.customBubbleCss = document.getElementById('setting-group-custom-bubble-css').value;
+                updateCustomBubbleStyle(currentChatId, group.customBubbleCss, group.useCustomBubbleCss);
+
+
                 saveData();
                 showToast('群聊设置已保存！');
                 chatRoomTitle.textContent = group.name;
