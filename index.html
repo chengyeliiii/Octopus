@@ -2152,6 +2152,18 @@
                 quality = 0.8, maxWidth = 800, maxHeight = 800
             } = options;
 
+            // --- 新增：处理GIF动图 ---
+            // 如果文件是GIF，则不经过canvas压缩，直接返回原始文件数据以保留动画
+            if (file.type === 'image/gif') {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = error => reject(error);
+                });
+            }
+
+            // --- 对其他静态图片（如PNG, JPG）进行压缩 ---
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
@@ -2181,7 +2193,11 @@
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                        
+                        // --- 关键修改：将输出格式改为 'image/png' ---
+                        // PNG格式支持透明背景，解决了透明图变黑的问题。
+                        // 对于PNG，quality参数通常被忽略，但保留也无妨。
+                        const compressedDataUrl = canvas.toDataURL('image/png', quality); 
                         resolve(compressedDataUrl);
                     };
                 };
